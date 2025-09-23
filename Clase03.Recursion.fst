@@ -95,6 +95,9 @@ let rec sum' (xs:list int) : Tot int =
   if Nil? xs
   then 0
   else last xs + sum' (init xs)
+// La función no se acepta porque la estructura xs no decrese, se debe usar otro parametro 
+// como la longitud de la lista, en cuyo caso deberíamos agregar al tipado de init que el tamaño 
+// decrese en cada llamada.
 
 (* La función de Ackermann se chequea correctamente
 con la métrica por defecto. *)
