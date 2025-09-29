@@ -11,12 +11,18 @@ let rec sum_int xs =
 (* Demuestre que sum_int "distribuye" sobre la concatenación de listas. *)
 let rec sum_append (l1 l2 : list int)
   : Lemma (sum_int (l1 @ l2) == sum_int l1 + sum_int l2)
-  = admit()
+  = 
+    match l1 with
+    | [] -> ()
+    | x::xs -> sum_append xs l2
 
 (* Idem para length, definida en la librería de F*. *)
 let rec len_append (l1 l2 : list int)
   : Lemma (length (l1 @ l2) == length l1 + length l2)
-  = admit()
+  =
+    match l1 with
+    | [] -> ()
+    | x::xs -> len_append xs l2
 
 let rec snoc (xs : list int) (x : int) : list int =
   match xs with
@@ -32,14 +38,47 @@ let rec rev_int (xs : list int) : list int =
   | [] -> []
   | x::xs' -> snoc (rev_int xs') x
 
-let rev_append_int (xs ys : list int)
-  : Lemma (rev_int (xs @ ys) == rev_int ys @ rev_int xs)
-= admit()
+let rec rev_cons (x:int) (xs : list int)
+  : Lemma (rev_int(x::xs) == snoc (rev_int xs) x)
+=
+  match xs with
+  | [] -> ()
+  | y::ys -> rev_cons x ys
 
-let rev_rev (xs : list int)
+let rec rev_snoc (xs : list int) (x:int)
+  : Lemma (rev_int(snoc xs x) == x::(rev_int xs))
+=
+  match xs with
+  | [] -> ()
+  | y::ys -> rev_snoc ys x
+
+let rec snoc_append (xs : list int) (ys : list int) (x:int)
+  : Lemma ((snoc (xs@ys) x) == xs @ (snoc ys x))
+=
+  match xs with
+  | [] -> ()
+  | z::zs -> snoc_append zs ys x
+
+let rec rev_append_int (xs ys : list int)
+  : Lemma (rev_int (xs @ ys) == rev_int ys @ rev_int xs)
+=
+  match xs with
+  | [] -> ()
+  | z::zs -> 
+    rev_append_int zs ys;
+    snoc_append (rev_int ys) (rev_int zs) z
+
+let rec rev_rev (xs : list int)
   : Lemma (rev_int (rev_int xs) == xs)
-= admit()
+= 
+  match xs with
+  | [] -> ()
+  | y::ys -> 
+    rev_rev ys;
+    rev_snoc (rev_int ys) y
 
 let rev_injective (xs ys : list int)
   : Lemma (requires rev_int xs == rev_int ys) (ensures xs == ys)
-= admit()
+=
+  rev_rev xs;
+  rev_rev ys
