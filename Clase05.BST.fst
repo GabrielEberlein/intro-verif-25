@@ -10,17 +10,17 @@ type bst0 =
   | L
   | N of bst0 & int & bst0
 
-let rec all_lt (x: int) (t: bst0) : bool =
+let rec all_lt (x: int) (t: bst0) :GTot bool =
   match t with
   | L -> true
   | N (l, y, r) -> all_lt x l && y < x && all_lt x r
 
-let rec all_gt (x: int) (t: bst0) : bool =
+let rec all_gt (x: int) (t: bst0) :GTot bool =
   match t with
   | L -> true
   | N (l, y, r) -> all_gt x l && y > x && all_gt x r
 
-let rec is_bst (t: bst0) : bool =
+let rec is_bst (t: bst0) :GTot bool =
   match t with
   | L -> true
   | N (l, x, r) -> is_bst l && is_bst r && all_lt x l && all_gt x r
@@ -36,20 +36,31 @@ let rec insert0 (x: int) (t: bst0) : bst0 =
     else if x < y then N (insert0 x l, y, r)
     else N (l, y, insert0 x r)
 
-let insert0_all_lt (x:int) (t:bst0) (y:int)
+let rec insert0_all_lt (x:int) (t:bst0) (y:int)
   : Lemma (requires all_lt y t /\ x < y)
           (ensures all_lt y (insert0 x t))
   =
-  admit()
+  match t with
+  | L -> ()
+  | N (l,z,r) -> insert0_all_lt x l y; insert0_all_lt x r y
 
-let insert0_all_gt (x:int) (t:bst0) (y:int)
+let rec insert0_all_gt (x:int) (t:bst0) (y:int)
   : Lemma (requires all_gt y t /\ x > y)
           (ensures all_gt y (insert0 x t))
   =
-  admit()
+  match t with
+  | L -> ()
+  | N (l,z,r) -> insert0_all_gt x l y; insert0_all_gt x r y
 
-let insert0_bst (x:int) (t:bst0) : Lemma (requires is_bst t) (ensures is_bst (insert0 x t)) =
-  admit()
+let rec insert0_bst (x:int) (t:bst0) : Lemma (requires is_bst t) (ensures is_bst (insert0 x t)) =
+  match t with
+  | L -> ()
+  | N (l,y,r) ->
+    insert0_bst x l;
+    insert0_bst x r;
+    if x = y then ()
+    else if x < y then insert0_all_lt x l y
+    else insert0_all_gt x r y 
 
 let insert (x:int) (t:bst) : bst =
   insert0_bst x t;
@@ -58,6 +69,7 @@ let insert (x:int) (t:bst) : bst =
 (* Nota: al usar GTot nos aseguramos que esta función sólo se usa
 en contextos de especificación, y nunca en código ejecutable. ¿Hay otras
 funciones que pueden marcarse así? *)
+//Sí, is_bst, all_lt y all_gt se pueden marcar como GTot
 let rec in_tree (x:int) (t:bst0) : GTot bool =
   match t with
   | L -> false
@@ -72,8 +84,49 @@ let rec member (x: int) (t: bst) : bool =
     else if x > y then member x r
     else true
 
-let member_ok (x:int) (t:bst) : Lemma (member x t == in_tree x t) =
-  admit()
+let rec in_tree_all_lt (x:int) (t:bst0) 
+: Lemma (all_lt x t ==> not (in_tree x t)) =
+  match t with
+  | L -> ()
+  | N(l,y,r)->
+    in_tree_all_lt x l;
+    in_tree_all_lt x r
+
+let rec in_tree_all_gt (x:int) (t:bst0) 
+: Lemma (all_gt x t ==> not (in_tree x t)) =
+  match t with
+  | L -> ()
+  | N(l,y,r)->
+    in_tree_all_gt x l;
+    in_tree_all_gt x r    
+
+let rec all_lt_trans (x y : int) (t : bst0) : Lemma (requires all_lt x t /\ y >= x) (ensures all_lt y t) =
+  match t with
+  | L -> ()
+  | N (l,_,r) ->
+    all_lt_trans x y l;
+    all_lt_trans x y r
+
+let rec all_gt_trans (x y : int) (t : bst0) : Lemma (requires all_gt x t /\ y <= x) (ensures all_gt y t) =
+  match t with
+  | L -> ()
+  | N (l,_,r) ->
+    all_gt_trans x y l;
+    all_gt_trans x y r
+
+let rec member_ok (x:int) (t:bst) : Lemma (member x t == in_tree x t) =
+  match t with
+  | L -> ()
+  | N (l,y,r) -> 
+    member_ok x l;
+    member_ok x r;
+    if x<y then (
+      all_gt_trans y x r;
+      in_tree_all_gt x r
+    )else if x>y then (
+      all_lt_trans y x l;
+      in_tree_all_lt x l
+    ) else ()
 
 let rec to_list (t: bst) : list int =
   match t with
@@ -118,12 +171,6 @@ let rec insert_mem (x:int) (t:bst) : Lemma (member x (insert x t)) =
     then insert_mem x l
     else insert_mem x r
 
-let all_lt_trans (x y : int) (t : bst0) : Lemma (requires all_lt x t /\ y >= x) (ensures all_lt y t) =
-  admit()
-
-let all_gt_trans (x y : int) (t : bst0) : Lemma (requires all_gt x t /\ y <= x) (ensures all_gt y t) =
-  admit()
-
 // NB: cambiado para fortalecer la precondición, y no devolver una opción.
 let rec extract_min0 (t: bst0{N? t}) : int & bst0 =
   match t with
@@ -133,19 +180,29 @@ let rec extract_min0 (t: bst0{N? t}) : int & bst0 =
     let t : bst0 = N (l', x, r) in
     (min, t)
 
-let extract_min_preserva_all_lt (y:int) (t : bst0{N? t})
+let rec extract_min_preserva_all_lt (y:int) (t : bst0{N? t})
   : Lemma (requires is_bst t /\ all_lt y t)
           (ensures all_lt y (snd (extract_min0 t)))
-= admit()
+= match t with
+  | N (L, _, L) -> ()
+  | N (l, _, L) -> extract_min_preserva_all_lt y l
+  | N (L, _, r) -> extract_min_preserva_all_lt y r
+  | N (l, _, r) -> 
+    extract_min_preserva_all_lt y l;
+    extract_min_preserva_all_lt y r
 
-let extract_min_es_bst (t:bst0{N? t})
+let rec extract_min_es_bst (t:bst0{N? t})
 : Lemma (requires is_bst t)
         (ensures is_bst (snd (extract_min0 t)))
-=
-  admit()
+= match t with
+  | N (L, _, _) -> ()
+  | N (l, y, _) ->
+    extract_min_es_bst l;
+    extract_min_preserva_all_lt y l 
 
 let extract_min (t: bst{N? t}) : (int & bst) =
-  admit()
+  extract_min_es_bst t;
+  let (m,t') = extract_min0 t in (m,t')
 
 let delete_root0 (t: bst0{N? t}) : bst0 =
   let N (l, _, r) = t in
