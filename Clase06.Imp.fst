@@ -77,21 +77,41 @@ type runsto : (p:stmt) -> (s0:state) -> (s1:state) -> Type0 =
 //   #s:state -> #s':state ->
 //   runsto (IfZ c (Seq b (While c b)) Skip) s s' ->
 //   runsto (While c b) s s'
-let r_while (#c:expr) (#b:stmt) (#s #s' : state) (pf : runsto (IfZ c (Seq b (While c b)) Skip) s s')
+let r_while (#c:expr) (#b:stmt) (#s #s' : state) 
+  (pf : runsto (IfZ c (Seq b (While c b)) Skip) s s')
   : runsto (While c b) s s'
-= admit()
+= match pf with
+  | R_IfZ_False (R_Skip _) sq -> R_While_False sq
+  | R_IfZ_True (R_Seq rt_b rt_while) sq -> R_While_True rt_b sq rt_while
 
 type cond = state -> bool
 
 noeq
 type hoare : (pre:cond) -> (p:stmt) -> (post:cond) -> Type0 =
-  | H_Skip : pre:cond -> hoare pre Skip pre // {P} Skip {P}
+  | H_Skip : #pre:cond -> hoare pre Skip pre // {P} Skip {P}
   | H_Seq :
     #p:stmt -> #q:stmt ->
     #pre:cond -> #mid:cond -> #post:cond ->
     hoare pre p mid -> hoare mid q post ->
     hoare pre (Seq p q) post  // {pre} p {mid} /\ {mid} q {post}    ==>    {pre} p;q {post}
-
+  | H_Assign : 
+    #pre:cond -> #v:var -> #e:expr -> 
+    hoare (fun (s:state) -> pre (fun (x:var)->if x=v then (eval_expr s e) else s x)) (Assign v e) pre 
+    // {\s.P(s⊕(x,[e]))} x:=e {P}
+  | H_If :
+    #pre:cond -> #post:cond ->
+    #c:expr -> #t:stmt -> #e:stmt ->
+    hoare (fun (s:state) -> pre s && (eval_expr s c) = 0) t post ->
+    hoare (fun (s:state) -> pre s && (eval_expr s c) = 1) e post ->
+    hoare pre (IfZ c t e) post 
+    // {pre/\[e]=true} t {post} /\ {pre/\[e]=false} e {post}   ==>   {pre} if c then t else e {post}
+  | H_While :
+    #inv:cond ->
+    #c:expr -> #b:stmt ->
+    hoare (fun (s:state) -> inv s && (eval_expr s c) = 0) b inv ->
+    hoare inv (While c b) (fun (s:state) -> inv s && (eval_expr s c) = 1)
+    // {inv/\[e]=true} b {inv}   ==>   {inv} while c b {inv /\ [e]=false}
+  
 let rec hoare_ok (p:stmt) (pre:cond) (post:cond) (pf : hoare pre p post)
                  (s0 s1 : state) (e_pf : runsto p s0 s1)
   : Lemma (requires pre s0)
