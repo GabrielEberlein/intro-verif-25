@@ -84,7 +84,7 @@ let rec go () : ML _ =
   begin try
     let x = input_int () in
     let y = input_int () in
-    if x < 0 || y < 0 then raise Neg else 
+    if x < 0 || y < 0 then raise Neg;
     let r = gcd x y in (* cambiar por memo_gcd *)
     assert (r == gcd x y);
     print_string ("gcd = " ^ string_of_int r ^ "\n")
